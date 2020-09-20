@@ -129,7 +129,9 @@ ORDER BY trans.Order_Ref ASC;
 
 ## Task 2: Sale analysis – revenue decline in ROW region
 
-The main thing I have decided to check was that the currency conversion was done right and, of course, it was, however, this made me realize the main reason for the decline of the revenue which was the exchange rate:
+The main thing I have wondered was: In which country do we have the most severe decline? 
+Using the converted amount to USD you would notice that for Germany the orders went up yet the revenue USD shows a decline which didn't make too much sense to me.
+I wondered if there was any difference on the price and, indeed, there wasn't. So, given the fact that the price stayed the same, the only logical factor was the exchange rate. I have checked if the currency conversion was done right and, of course, it was; however, this made me realize that the main reason for the decline of the revenue was the exchange rate:
 ```
 SELECT cou.region,
 	AVG(CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END) as RateTo_Usd2018H1,
@@ -239,4 +241,118 @@ And I have noticed that we only had an actual decline in revenue in New Zealand,
 ![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Revenue%20analysis%20by%20country.PNG?raw=true)
 
 Although as you can see the difference is very low, I have dagged deeper to try to understand which product is not performing that well in those countries:
+```
+SELECT 
+Combined.Country,
+Combined.Product,
+Combined.Currency,
+SUM (CASE WHEN Combined.Year = '2019' THEN Combined.Revenue ELSE 0.00 END) AS '2019 Revenue',
+SUM (CASE WHEN Combined.Year = '2018' THEN Combined.Revenue ELSE 0.00 END) AS '2018 Revenue',
+(SUM (CASE WHEN Combined.Year = '2019' THEN Combined.Revenue ELSE 0.00 END) -
+SUM (CASE WHEN Combined.Year = '2018' THEN Combined.Revenue ELSE 0.00 END)) AS 'Revenue Difference'
+FROM 
 
+(SELECT
+T_2019.Country,
+T_2019.Product,
+T_2019.Currency,
+'2019' As Year,
+SUM(T_2019.Sales_2019_H1) AS 'Revenue',
+SUM(T_2019.Quantity_2019_H1) AS 'Quantity Ordered',
+SUM(T_2019.Orders_2019_H1) AS 'Total Orders'
+FROM dbfour.dbo.T_2019 T_2019
+GROUP BY
+T_2019.Country,
+T_2019.Product,
+T_2019.Currency
+UNION 
+SELECT
+T_2018.Country,
+T_2018.Product,
+T_2018.Currency,
+'2018' AS Year,
+SUM(T_2018.Sales_2018_H1) AS 'Revenue',
+SUM(T_2018.Quantity_2018_H1) AS 'Quantity Ordered',
+SUM(T_2018.Orders_2018_H1) AS 'Total Orders'
+FROM dbfour.dbo.T_2018 T_2018
+GROUP BY
+T_2018.Country,
+T_2018.Product,
+T_2018.Currency) AS Combined
+
+
+WHERE 
+Combined.Country = 'Austria' OR 
+Combined.Country = 'Australia' OR
+Combined.Country = 'New Zealand'
+GROUP BY
+Combined.Country,
+Combined.Product,
+Combined.Currency;
+```
+Which returned the following output. 
+**Please Note:** Marked in RED the products that have marked the highest difference and in ORANGE those that marked a small differemce:
+
+![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Product%20Revenue%20Analysis%20for%20Austria,%20Australia%20and%20NZ.png?raw=true)
+
+Obviously, this decline is a result of the decline in the orders and amounts. Let's see a summary of what have changed in these countries in terms of Orders, Amounts and Revenue with the query:
+```
+SELECT 
+Combined.Country,
+Combined.Product,
+Combined.Currency,
+(SUM (CASE WHEN Combined.Year = '2019' THEN Combined.Revenue ELSE 0.00 END) -
+SUM (CASE WHEN Combined.Year = '2018' THEN Combined.Revenue ELSE 0.00 END)) AS 'Revenue Difference',
+(SUM (CASE WHEN Combined.Year = '2019' THEN Combined.[Total Orders] ELSE 0.00 END) -
+SUM (CASE WHEN Combined.Year = '2018' THEN Combined.[Total Orders] ELSE 0.00 END)) AS 'Orders Difference',
+(SUM (CASE WHEN Combined.Year = '2019' THEN Combined.[Quantity Ordered] ELSE 0.00 END) -
+SUM (CASE WHEN Combined.Year = '2018' THEN Combined.[Quantity Ordered] ELSE 0.00 END)) AS 'Quantity Difference'
+FROM 
+
+(SELECT
+T_2019.Country,
+T_2019.Product,
+T_2019.Currency,
+'2019' As Year,
+SUM(T_2019.Sales_2019_H1) AS 'Revenue',
+SUM(T_2019.Quantity_2019_H1) AS 'Quantity Ordered',
+SUM(T_2019.Orders_2019_H1) AS 'Total Orders'
+FROM dbfour.dbo.T_2019 T_2019
+GROUP BY
+T_2019.Country,
+T_2019.Product,
+T_2019.Currency
+UNION 
+SELECT
+T_2018.Country,
+T_2018.Product,
+T_2018.Currency,
+'2018' AS Year,
+SUM(T_2018.Sales_2018_H1) AS 'Revenue',
+SUM(T_2018.Quantity_2018_H1) AS 'Quantity Ordered',
+SUM(T_2018.Orders_2018_H1) AS 'Total Orders'
+FROM dbfour.dbo.T_2018 T_2018
+GROUP BY
+T_2018.Country,
+T_2018.Product,
+T_2018.Currency) AS Combined
+
+
+WHERE 
+Combined.Country = 'Austria' OR 
+Combined.Country = 'Australia' OR
+Combined.Country = 'New Zealand'
+GROUP BY
+Combined.Country,
+Combined.Product,
+Combined.Currency;
+```
+Which would return the following output:
+
+![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Summary_Orders_quantity_Revenue_Difference%20(2).png?raw=true)
+
+In conclusion: The main reason for the drop was the fluctuation of the exchange rate, there are some drops in Austria, Australia and New Zealand for which my recommendation would be: 
+
+- Check the logs and the feedbacks coming from those countries to understand why they aren't ordering.
+- Review the market nieche, are we trying to sell only to IT Companies? Even companies that use simply BI Tools need an effective ticketing system such YouTrack in Cloud.
+- Do a market test in those countries to understand what products are the most popular in the same nieche of our products and investigate on their feautures, are they doing something better? Is their tool more scalable in terms of use? Does it require much more expertise? Is it more intuitive? 
