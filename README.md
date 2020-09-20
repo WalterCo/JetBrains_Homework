@@ -126,6 +126,7 @@ curr.SYMBOL,
 csv.CURRENCY
 ORDER BY trans.Order_Ref ASC;
 ```
+![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Task%201%20Final%20output.PNG?raw=true)
 
 ## Task 2: Sale analysis – revenue decline in ROW region
 
