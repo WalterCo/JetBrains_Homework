@@ -3,9 +3,9 @@
 ## Task 1 - Data quality – the difference between NetSuite ERP and payment gateway
 
 The first thing I have done with this task was to merge together all the CSV files that I have got with it. It took only few seconds thanks to a freeware excel extension called "RDB Merge". 
-I have imagined myself in the situation of having to provide this data to the finance team in order for them to review the transactions and update the wrong ones. So, once the CSV files were merged, I have uploaded them into my database (dbfour) and started thinking of the best way to flag inconsistencies between the csv data and the MySQL database. 
+I have imagined myself in the situation of having to provide this data to the finance team in order for them to review the transactions and update the wrong ones. So, once the CSV files were merged, I have uploaded them into my database (dbfour) and started thinking of the best way to flag inconsistencies between the CSV data and the MySQL database. 
 
-Unfortunately I didn't have a unique ID that I could have used to link the data properly, so I have decided to **create a query that summarized the total for NetSuite and Paymeny Gateway by Order_ref** this way I could easily identify which orders had some discrepancies in the payments. 
+Unfortunately, I didn't have a unique ID that I could have used as a primary key to link the data properly, so I have decided to **create a query that summarized the total for NetSuite and Paymeny Gateway by Order_ref** - this way I could easily identify which orders had some discrepancies in the payments. 
 
 ```
 SELECT *
@@ -35,7 +35,7 @@ IIF(csv.GROSS<0,csv.GROSS*-1,csv.GROSS) AS Gross_For_Calculations
 FROM dbfour.dbo.[Adyen Data Combined] csv) Order_Data ON Order_Data.ORDER_REF = Netsuite_Data.ORDER_REF
 GROUP BY Netsuite_Data.ORDER_REF) AS Comparison;
 ```
-I have placed the query results with an actual difference in the table **"Orders_With_Wrong_Transactions"**, This way I had the criteria to identify where finance would have to go and review the transactions.
+I have placed the query results with an actual difference in the table **"Orders_With_Wrong_Transactions"**. This way I had the criteria to identify where finance would have to go and review the transactions.
 ```
 SELECT *
 INTO Orders_With_Wrong_Transactions
@@ -65,7 +65,7 @@ IIF(csv.GROSS<0,csv.GROSS*-1,csv.GROSS) AS Gross_For_Calculations
 FROM dbfour.dbo.[Adyen Data Combined] csv) Order_Data ON Order_Data.ORDER_REF = Netsuite_Data.ORDER_REF
 GROUP BY Netsuite_Data.ORDER_REF) AS Comparison WHERE Comparison.Difference <> 0;
 ```
-I have converted all the amounts to positive for simplicity and left out the "Accounts Receivable" and "Deferred Revenue" as they are supposed to cancel each other, which they were, they weren't relevant for the search of discrepancies. Once the table was completed, I have ran a quantity of random checks to make sure that those records were actually for orders with wrong transactions:
+I have converted all the amounts to positive for simplicity and left out the "Accounts Receivable" and "Deferred Revenue" as they cancel each other, therefore, they weren't relevant for the search of discrepancies. Once the table was completed, I have ran a quantity of random checks to make sure that those records were actually for orders with wrong transactions:
 ```
 SELECT
 trans.ORDER_REF,
@@ -88,12 +88,12 @@ FROM dbfour.dbo.[Adyen Data Combined] csv
 WHERE csv.ORDER_REF = 'E000015977'
 ORDER BY csv.ORDER_REF ASC;
 ```
-With the above query I was comparing the output by ORDER_REF. In the order E000015977 as you can see on the below screenshot:
+With the above query I was comparing the outputs by ORDER_REF. In the order E000015977 as you can see on the below screenshot:
 
 ![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Order%20with%20wrong%20transactions.PNG?raw=true)
 
-It looks like we have only the "FEE" portion processed in NetSuite on opposite of Payment Gateway where we have Net and fee.
-Finally, I have wrapped it up in the below query where I also double check the currency to make sure that it matches:
+It looks like we have only the "FEE" portion processed in NetSuite whilst in Payment Gateway we have both NET and FEE.
+Finally, I have wrapped it up in the below query where I also compare the currency of Netsuite vs the currency of Payment Gateway to make sure that it matches:
 
 ```
 Select
@@ -130,16 +130,18 @@ ORDER BY trans.Order_Ref ASC;
 
 ## Task 2: Sale analysis – revenue decline in ROW region
 
-The main thing I have wondered was: In which country do we have the most severe decline? 
-Using the converted amount to USD you would notice that for Germany the orders went up yet the revenue USD shows a decline which didn't make too much sense to me.
-I wondered if there was any difference on the price and, indeed, there wasn't. So, given the fact that the price stayed the same, the only logical factor was the exchange rate. I have checked if the currency conversion was done right and, of course, it was; however, this made me realize that the main reason for the decline of the revenue was the exchange rate:
+The main question I asked myself was: In which country do we have the most severe revenue decline? 
+Using the amount converted to USD you would notice that for Germany the number of orders and the ordered quantity went up yet the revenue in USD shows a decline which didn't make too much sense to me.
+I wondered if there was any difference in price and, indeed, there wasn't. So, given the fact that the price stayed the same, the only logical factor was the exchange rate. I have checked if the currency conversion was done right and, of course, it was; however, this made me realize that the main reason for the decline of the revenue was the exchange rate:
 ```
-SELECT cou.region,
-	AVG(CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END) as RateTo_Usd2018H1,
-	AVG(CASE WHEN YEAR(ord.exec_date) = 2019 THEN exRate.rate ELSE 0.00 END) as RateTo_Usd2019H1,
-	((AVG(CASE WHEN YEAR(ord.exec_date) = 2019 THEN exRate.rate ELSE 0.00 END)-
-	 AVG(CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END))/
-	 AVG(CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END))*100 as rate_difference_perc
+SELECT 
+	cou.region,
+	ord.Currency,
+	AVG(Distinct CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END) as RateTo_Usd2018H1,
+	AVG(Distinct CASE WHEN YEAR(ord.exec_date) = 2019 THEN exRate.rate ELSE 0.00 END) as RateTo_Usd2019H1,
+	((AVG(Distinct CASE WHEN YEAR(ord.exec_date) = 2019 THEN exRate.rate ELSE 0.00 END)-
+	 AVG(Distinct CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END))/
+	 AVG(Distinct CASE WHEN YEAR(ord.exec_date) = 2018 THEN exRate.rate ELSE 0.00 END))*100 as rate_difference_perc
 FROM bi.sales.Orders ord
 JOIN bi.sales.OrderItems ordItm ON ord.id = ordItm.order_id
 JOIN bi.sales.Customer cust ON ord.customer = cust.id
@@ -149,11 +151,13 @@ JOIN bi.sales.Product prod ON ordItm.product_id = prod.product_id
 WHERE ord.is_paid = 1 -- Only paid orders, exclude pre-orders
   AND YEAR(ord.exec_date) IN (2018, 2019) -- Year 2018, 2019
   AND MONTH(ord.exec_date) BETWEEN 1 AND 6 -- H1
-GROUP BY cou.region
+  AND cou.region != 'US'
+  AND ord.Currency != 'USD'
+GROUP BY cou.region, ord.currency
 ORDER BY 1
 ;
 ```
-This query shows how there is an increment by 6.4% in the average exchange rate from 2018 H1 to 2019 H1 which is the primary cause of the decline since we are looking at units per USD. After noticing that the currency was playing a significant factor, I have then summarized the data in two tables: one for 2018 and one for 2019.
+This query shows that there was an increment of 6.4% of the average exchange rate from USD to GBP and an increment of 6.8% of the average exchange rate from USD to EUR  between 2018 H1 and 2019 H1 which is the primary cause of the decline in USD revenue. After establishing that the currency was playing a significant factor, I have summarized the data in two tables: one for 2018 and another one for 2019.
 
 ```
 SELECT cou.region,
@@ -238,10 +242,11 @@ T_2018.Country,
 T_2018.Currency) T_2018 ON T_2019.Country = T_2018.Country;
 
 ```
-And I have noticed that we only had an actual decline in revenue in New Zealand, Austria and Australia.
+And I have noticed that we only had an actual decline in revenue in New Zealand (USD), Austria (EUR) and Australia (USD).
+
 ![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Revenue%20analysis%20by%20country.PNG?raw=true)
 
-Although as you can see the difference is very low, I have dagged deeper to try to understand which product is not performing that well in those countries:
+Although as you can see the difference is very low, I have dagged deeper trying to understand which product is not performing well in those countries:
 ```
 SELECT 
 Combined.Country,
@@ -292,11 +297,11 @@ Combined.Product,
 Combined.Currency;
 ```
 Which returned the following output. 
-**Please Note:** Marked in RED the products that have marked the highest difference and in ORANGE those that marked a small differemce:
+**Please Note:** Marked in RED are the products that show the highest difference and in ORANGE are those that show a small difference:
 
 ![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Product%20Revenue%20Analysis%20for%20Austria,%20Australia%20and%20NZ.png?raw=true)
 
-Obviously, this decline is a result of the decline in the orders and amounts. Let's see a summary of what have changed in these countries in terms of Orders, Amounts and Revenue with the query:
+Obviously, this revenue decrease is a result of a decline in orders and quantity of ordered products. Let's see a summary of what have changed in these countries in terms of Orders, Amounts and Revenue with the below query:
 ```
 SELECT 
 Combined.Country,
@@ -352,8 +357,8 @@ Which would return the following output:
 
 ![image](https://github.com/WalterCo/JetBrains_Homework/blob/master/Summary_Orders_quantity_Revenue_Difference%20(2).png?raw=true)
 
-In conclusion: The main reason for the drop was the fluctuation of the exchange rate, there are some drops in Austria, Australia and New Zealand for which my recommendation would be: 
+**Conclusion:** The main reason for the drop was the fluctuation of the exchange rate, there is a decrease in revenue/orders/ordered quantity in Austria, Australia and New Zealand for which my recommendation would be ad follows: 
 
-- Check the logs and the feedbacks coming from those countries to understand why they aren't ordering.
-- Review the market nieche, are we trying to sell only to IT Companies? Even companies that use simply BI Tools need an effective ticketing system such YouTrack in Cloud.
-- Do a market test in those countries to understand what products are the most popular in the same nieche of our products and investigate on their feautures, are they doing something better? Is their tool more scalable in terms of use? Does it require much more expertise? Is it more intuitive? 
+- Check the logs and the feedbacks coming from those countries to understand why the number of orders decreased.
+- Review the market nieche, are we trying to sell only to IT Companies? Even companies that simply use only BI Tools need an effective ticketing system such as **YouTrack in Cloud**.
+- Do a market research in those countries to understand what products are the most popular in the same nieche and investigate their feautures, are any of their feautures better? Is their tool more scalable in terms of use? Does it requires much more expertise? Is it more intuitive? etc.
